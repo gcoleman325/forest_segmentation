@@ -58,13 +58,6 @@ for file_path in files:
     points = points.reshape(-1, points.shape[-1])
     
     cov_metrics_array = cov_metrics(pcd_down)
-
-    if points.shape[0] != fpfh_features.shape[0]:
-        raise ValueError("Mismatch in number of points and FPFH features.")
-    if points.shape[0] != cov_metrics_array.shape[0]:
-        print(points.shape[0])
-        print(cov_metrics_array.shape[0])
-        raise ValueError("Mismatch in number of points and covariance metrics.")
     
     fpfh_with_points = np.hstack((points, fpfh_features))
     cov_with_points = np.hstack((points, cov_metrics_array))
