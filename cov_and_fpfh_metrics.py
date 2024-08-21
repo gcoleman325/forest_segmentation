@@ -1,5 +1,8 @@
 import numpy as np
 import open3d as o3d
+import pandas as pd
+from sklearn.cluster import KMeans
+import random
 import os
 import glob
 
@@ -43,31 +46,62 @@ def cov_metrics(pcd):
   
     return np.array([tuple(row) for row in metrics_array])
 
-inFile = "D:/scans/New folder"
-outFile = "D:/scans/New folder"
 
-files = glob.glob(os.path.join(inFile, '*.pcd'))
 
-for file_path in files:
-    pcd = o3d.io.read_point_cloud(file_path)
+def process_files(inFile, outFile):
+    files = glob.glob(os.path.join(inFile, '*.pcd'))
 
-    pcd_down, pcd_fpfh = preprocess_point_cloud(pcd, 0.5)
-    fpfh_features = np.asarray(pcd_fpfh.data).T
+    for file_path in files:
+        pcd = o3d.io.read_point_cloud(file_path)
 
-    points = np.asarray(pcd_down.points)
-    points = points.reshape(-1, points.shape[-1])
-    
-    cov_metrics_array = cov_metrics(pcd_down)
-    
-    fpfh_with_points = np.hstack((points, fpfh_features))
-    cov_with_points = np.hstack((points, cov_metrics_array))
-    
-    base_name = os.path.basename(file_path).replace('.pcd', '')
-    output_csv1 = os.path.join(outFile, base_name + "_fpfh.csv")
-    output_csv2 = os.path.join(outFile, base_name + "_cov.csv")
-    
-    np.savetxt(output_csv1, fpfh_with_points, delimiter=',', header='x,y,z,' + ','.join([f'feature{i}' for i in range(fpfh_features.shape[1])]), comments='')
-    
-    cov_headers = ['linearity', 'planarity', 'scattering', 'omnivariance', 'anisotropy', 'eigentropy', 'curvature']
-    header2 = 'x,y,z,' + ','.join(cov_headers)
-    np.savetxt(output_csv2, cov_with_points, delimiter=',', header=header2, comments='')
+        pcd_down, pcd_fpfh = preprocess_point_cloud(pcd, 0.1)
+        fpfh_features = np.asarray(pcd_fpfh.data).T
+
+        points = np.asarray(pcd_down.points)
+        points = points.reshape(-1, points.shape[-1])
+        
+        cov_metrics_array = cov_metrics(pcd_down)
+        
+        fpfh_with_points = np.hstack((points, fpfh_features))
+        cov_with_points = np.hstack((points, cov_metrics_array))
+        
+        base_name = os.path.basename(file_path).replace('.pcd', '')
+        output_csv1 = os.path.join(outFile, base_name + "_fpfh.csv")
+        output_csv2 = os.path.join(outFile, base_name + "_cov.csv")
+        
+        np.savetxt(output_csv1, fpfh_with_points, delimiter=',', header='x,y,z,' + ','.join([f'feature{i}' for i in range(fpfh_features.shape[1])]), comments='')
+        
+        cov_headers = ['linearity', 'planarity', 'scattering', 'omnivariance', 'anisotropy', 'eigentropy', 'curvature']
+        header2 = 'x,y,z,' + ','.join(cov_headers)
+        np.savetxt(output_csv2, cov_with_points, delimiter=',', header=header2, comments='')
+
+
+
+
+df = pd.read_csv("D:/scans/preprocessed_pcd/CCB-1-1_fpfh.csv")
+
+n_clusters = 100
+model = KMeans(n_clusters=n_clusters)
+model.fit(df)
+predictions = model.predict(df)
+predictions = np.array(predictions)
+
+xyz = df.iloc[:,:3]
+xyz = [(row['x'], row['y'], row['z']) for _, row in df.iterrows()]
+xyz = np.array(xyz)
+
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(xyz)
+o3d.visualization.draw_geometries([pcd])
+
+objects = []
+for i in range(n_clusters):
+    R = random.randint(0, 255)
+    G = random.randint(0, 255)
+    B = random.randint(0, 255)
+    indices = np.where(predictions[:] == i)[0]
+    object = pcd.select_by_index(indices)
+    object.paint_uniform_color([R, G, B])
+    objects.append(object)
+
+o3d.visualization.draw_geometries([objects])
