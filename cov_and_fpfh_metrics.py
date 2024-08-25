@@ -5,24 +5,28 @@ from sklearn.cluster import KMeans
 import random
 import os
 import glob
+from sklearn.naive_bayes import BernoulliNB
 
-def preprocess_point_cloud(pcd, voxel_size):
-    pcd = pcd.voxel_down_sample(voxel_size)
-    
-    radius_normal = voxel_size * 2
+def preprocess_point_cloud(pcd):
+    radius_normal = 0.2
+    print("estimating normals")
     pcd.estimate_normals(
         o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
 
-    radius_feature = voxel_size * 5
+    radius_feature = 0.5
+    print("computing fpfh")
     pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
         pcd,
         o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
-    return pcd, pcd_fpfh
+    fpfh = np.asarray(pcd_fpfh.data).T
+    return pcd, fpfh
 
 def cov_metrics(pcd):
+    print("estimating covariances")
     covs = pcd.estimate_covariances()
     covs = np.asarray(pcd.covariances)
 
+    print("computing eigen-based metrics")
     metrics = []
     for pt in covs:
         eigenvalues = np.linalg.eigvals(pt)
@@ -75,33 +79,51 @@ def process_files(inFile, outFile):
         header2 = 'x,y,z,' + ','.join(cov_headers)
         np.savetxt(output_csv2, cov_with_points, delimiter=',', header=header2, comments='')
 
+def likely_objects(preprocessed_path):
+    pcd = o3d.io.read_point_cloud(preprocessed_path)
+    pcd, pcd_fpfh = preprocess_point_cloud(pcd)
+    cov = cov_metrics(pcd)
+    all_metrics = np.hstack([pcd_fpfh, cov])
+
+    pcd = np.asarray(pcd.points)
+    no_trees = o3d.io.read_point_cloud(preprocessed_path.replace('preprocessed', 'no_trees'))
+    no_trees, no_trees_fpfh = preprocess_point_cloud(no_trees)
+    no_trees = np.asarray(no_trees.points)
+    cylinder = np.ones((pcd.shape[0], 1))
+    pcd = np.hstack((pcd, cylinder))
+    mask = np.isin(pcd, no_trees).all(axis=1)
+    pcd[mask, -1] = 0
+
+    return pcd
+
+def testing(self):
+    df = pd.read_csv("D:/scans/preprocessed_pcd/CCB-1-1_fpfh.csv")
+
+    n_clusters = 100
+    model = KMeans(n_clusters=n_clusters)
+    model.fit(df)
+    predictions = model.predict(df)
+    predictions = np.array(predictions)
+
+    xyz = df.iloc[:,:3]
+    xyz = [(row['x'], row['y'], row['z']) for _, row in df.iterrows()]
+    xyz = np.array(xyz)
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(xyz)
+    o3d.visualization.draw_geometries([pcd])
+
+    objects = []
+    for i in range(n_clusters):
+        R = random.randint(0, 255)
+        G = random.randint(0, 255)
+        B = random.randint(0, 255)
+        indices = np.where(predictions[:] == i)[0]
+        object = pcd.select_by_index(indices)
+        object.paint_uniform_color([R, G, B])
+        objects.append(object)
+
+    o3d.visualization.draw_geometries([objects])
 
 
-
-df = pd.read_csv("D:/scans/preprocessed_pcd/CCB-1-1_fpfh.csv")
-
-n_clusters = 100
-model = KMeans(n_clusters=n_clusters)
-model.fit(df)
-predictions = model.predict(df)
-predictions = np.array(predictions)
-
-xyz = df.iloc[:,:3]
-xyz = [(row['x'], row['y'], row['z']) for _, row in df.iterrows()]
-xyz = np.array(xyz)
-
-pcd = o3d.geometry.PointCloud()
-pcd.points = o3d.utility.Vector3dVector(xyz)
-o3d.visualization.draw_geometries([pcd])
-
-objects = []
-for i in range(n_clusters):
-    R = random.randint(0, 255)
-    G = random.randint(0, 255)
-    B = random.randint(0, 255)
-    indices = np.where(predictions[:] == i)[0]
-    object = pcd.select_by_index(indices)
-    object.paint_uniform_color([R, G, B])
-    objects.append(object)
-
-o3d.visualization.draw_geometries([objects])
+print(likely_objects("D:/scans/preprocessed_pcd/CCB-1-1.pcd"))
