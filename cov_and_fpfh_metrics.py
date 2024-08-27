@@ -125,5 +125,12 @@ def testing(self):
 
     o3d.visualization.draw_geometries([objects])
 
-
-print(likely_objects("D:/scans/preprocessed_pcd/CCB-1-1.pcd"))
+data = np.genfromtxt("D:/scans/preprocessed_pcd/CCB-1-1_theoretically-classed.csv", delimiter=',')
+points = data[:, :3] 
+classes = data[:, 3]
+source_temp = copy.deepcopy(source)
+target_temp = copy.deepcopy(target)
+source_temp.paint_uniform_color([1, 0.706, 0])
+target_temp.paint_uniform_color([0, 0.651, 0.929])
+source_temp.transform(transformation)
+o3d.visualization.draw_geometries([source_temp, target_temp])
