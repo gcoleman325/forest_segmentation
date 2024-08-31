@@ -125,12 +125,29 @@ def testing(self):
 
     o3d.visualization.draw_geometries([objects])
 
+pcd = o3d.io.read_point_cloud(preprocessed_path)
+pcd, pcd_fpfh = preprocess_point_cloud(pcd)
+cov = cov_metrics(pcd)
+all_metrics = np.hstack([pcd_fpfh, cov])
+pcd = np.asarray(pcd.points)
+
+no_trees = o3d.io.read_point_cloud(preprocessed_path.replace('preprocessed', 'no_trees'))
+no_trees, no_trees_fpfh = preprocess_point_cloud(no_trees)
+no_trees = np.asarray(no_trees.points)
+cylinder = np.ones((pcd.shape[0], 1))
+pcd = np.hstack((pcd, cylinder))
+mask = np.isin(pcd, no_trees).all(axis=1)
+pcd[mask, -1] = 0
+
 data = np.genfromtxt("D:/scans/preprocessed_pcd/CCB-1-1_theoretically-classed.csv", delimiter=',')
-points = data[:, :3] 
-classes = data[:, 3]
-source_temp = copy.deepcopy(source)
-target_temp = copy.deepcopy(target)
-source_temp.paint_uniform_color([1, 0.706, 0])
-target_temp.paint_uniform_color([0, 0.651, 0.929])
-source_temp.transform(transformation)
-o3d.visualization.draw_geometries([source_temp, target_temp])
+trees = data[data[:, 3] == 1, :3]
+not_trees = data[data[:, 3] == 0, :3]
+
+trees_pcd = o3d.geometry.PointCloud()
+trees_pcd.points = o3d.utility.Vector3dVector(trees)
+
+not_trees_pcd = o3d.geometry.PointCloud()
+not_trees_pcd.points = o3d.utility.Vector3dVector(not_trees)
+
+o3d.visualization.draw_geometries([trees_pcd])
+o3d.visualization.draw_geometries([not_trees_pcd])
