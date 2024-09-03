@@ -6,11 +6,8 @@ import random
 import os
 import glob
 from sklearn.naive_bayes import BernoulliNB
-from sklearn.cluster import KMeans
 
 def preprocess_point_cloud(pcd):
-    pcd = pcd.voxel_down_sample(voxel_size=0.05)
-
     radius_normal = 0.2
     print("estimating normals")
     pcd.estimate_normals(
@@ -42,9 +39,9 @@ def cov_metrics(pcd):
         anisotropy = (e1 - e3) / e1
         eigentropy = -(e1 * np.log(e1) + e2 * np.log(e2) + e3 * np.log(e3))
         curvature = e3 / (e1 + e2 + e3)
-
+        
         metrics.append((linearity, planarity, scattering, omnivariance, anisotropy, eigentropy, curvature))
-
+    
     dtype = [('linearity', 'f8'), ('planarity', 'f8'), ('scattering', 'f8'), 
             ('omnivariance', 'f8'), ('anisotropy', 'f8'), ('eigentropy', 'f8'), 
             ('curvature', 'f8')]
@@ -81,7 +78,6 @@ def process_files(inFile, outFile):
         cov_headers = ['linearity', 'planarity', 'scattering', 'omnivariance', 'anisotropy', 'eigentropy', 'curvature']
         header2 = 'x,y,z,' + ','.join(cov_headers)
         np.savetxt(output_csv2, cov_with_points, delimiter=',', header=header2, comments='')
-        return 
 
 def likely_objects(preprocessed_path):
     pcd = o3d.io.read_point_cloud(preprocessed_path)
@@ -129,21 +125,6 @@ def testing(self):
 
     o3d.visualization.draw_geometries([objects])
 
-## TESTING ##
-# loading/preprocessing 
-print("reading point cloud")
-pcd = o3d.io.read_point_cloud("C:/Users/ellie/OneDrive/Desktop/lidar_local/ccb-3_preprocessed.pcd")
-print("preprocessing point cloud")
-pcd, fpfh = preprocess_point_cloud(pcd)
-print("getting metrics")
-cov = cov_metrics(pcd)
-
-cov_headers = ['linearity', 'planarity', 'scattering', 'omnivariance', 'anisotropy', 'eigentropy', 'curvature']
-header = 'x,y,z,' + ','.join([f'feature{i}' for i in range(fpfh.shape[0])]) + ','.join(cov_headers)
-all_metrics = np.hstack([np.asarray(pcd.points), fpfh, cov])
-
-print(all_metrics)
-np.savetxt("C:/Users/ellie/OneDrive/Desktop/lidar_local/ccb-3_metrics.csv", all_metrics, delimiter=',', header=header, comments='')
-
-# k cluster
-# kmeans = KMeans(n_clusters=4, random_state=0, n_init="auto").fit(all_metrics)
+pcd = o3d.io.read_point_cloud("C:/Users/ellie/OneDrive/Desktop/lidar_local/ccb-3-2-2go.pcd")
+pcd = preprocess_point_cloud(pcd)
+o3d.visualization.draw_geometries([pcd])
